@@ -8,7 +8,7 @@ ComfyUI-MusicAnalyzer —— 音乐理解与结构化描述节点（仅分析，
   - 音乐描述器：面向文生音乐模型的自然语言描述
   - 音乐信息转JSON：把各部分汇总为一个结构化 JSON
 
-模型支持（首次使用自动下载到本节点 models/ 目录）：
+模型支持（需手动下载到本节点 models/ 目录，不会自动下载）：
   - ACE-Step-Transcriber（默认，Qwen2.5-Omni 架构，歌词/结构/声乐）
   - Qwen2-Audio-7B-Instruct
   - Qwen2.5-Omni-3B / 7B，Ke-Omni-R-3B，Qwen3-Omni-8B
@@ -80,18 +80,25 @@ def _get_model_dir(model_key):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", model_key)
 
 
-def _ensure_model_downloaded(model_key):
-    """模型未下载时自动从 HuggingFace 下载到节点目录。"""
+def _check_model_local(model_key):
+    """检查模型是否已手动下载到节点目录（不做自动下载）。
+
+    模型须手动放到 models/<模型名>/ 下（需包含 config.json）。
+    """
     model_dir = _get_model_dir(model_key)
     config_path = os.path.join(model_dir, "config.json")
     if os.path.isfile(config_path):
         return model_dir
     repo_id = _ANALYSIS_MODELS[model_key]
-    from huggingface_hub import snapshot_download
-    print(f"[MusicAnalyzer] 首次使用，正在下载模型 {model_key} ...")
-    snapshot_download(repo_id, local_dir=model_dir)
-    print(f"[MusicAnalyzer] {model_key} 下载完成。")
-    return model_dir
+    raise RuntimeError(
+        f"[MusicAnalyzer] 模型 {model_key} 未找到，请手动下载后放入：\n"
+        f"  目录：{model_dir}\n"
+        f"下载命令（国内网络建议先执行 set HF_ENDPOINT=https://hf-mirror.com）：\n"
+        f"  huggingface-cli download {repo_id} --local-dir \"{model_dir}\"\n"
+        f"或使用 Python：\n"
+        f"  python -c \"from huggingface_hub import snapshot_download; "
+        f"snapshot_download('{repo_id}', local_dir=r'{model_dir}')\""
+    )
 
 
 def _get_analysis_device():
@@ -115,7 +122,7 @@ def _load_audio_model(model_key, use_flash_attn=False):
     if _audio_model is not None:
         _unload_audio_model()
 
-    model_dir = _ensure_model_downloaded(model_key)
+    model_dir = _check_model_local(model_key)
     load_kwargs = dict(
         torch_dtype=torch.bfloat16,
         device_map=_get_analysis_device_map(),
@@ -504,7 +511,7 @@ def _extract_tags_qwen2_audio(audio_dict, model, processor, max_new_tokens, audi
             _unload_audio_model()
             from transformers import Qwen2AudioForConditionalGeneration, AutoProcessor
             global _audio_model, _audio_processor, _audio_model_name
-            model_dir = _ensure_model_downloaded("Qwen2-Audio-7B-Instruct")
+            model_dir = _check_model_local("Qwen2-Audio-7B-Instruct")
             _audio_model = Qwen2AudioForConditionalGeneration.from_pretrained(
                 model_dir, torch_dtype=torch.bfloat16,
                 device_map=_get_analysis_device_map(),
@@ -1146,7 +1153,7 @@ class MusicAnalyzer:
                 }),
                 "模型": (list(_ANALYSIS_MODELS.keys()), {
                     "default": _NATIVE_ANALYSIS_MODEL,
-                    "tooltip": "用于标签提取的音频理解模型，首次使用自动下载。",
+                    "tooltip": "用于标签提取的音频理解模型，需提前手动下载到本节点 models/ 目录。",
                 }),
             },
         }
@@ -1219,7 +1226,7 @@ class MusicTranscriber:
             "optional": {
                 "模型": (list(_ANALYSIS_MODELS.keys()), {
                     "default": "ACE-Step-Transcriber",
-                    "tooltip": "转录模型，Whisper 系列最省显存。",
+                    "tooltip": "转录模型，Whisper 系列最省显存。需提前手动下载到本节点 models/ 目录。",
                 }),
                 "提示词": ("STRING", {
                     "default": _DEFAULT_TRANSCRIBE_PROMPT,
@@ -1290,7 +1297,7 @@ class MusicCaptioner:
             "optional": {
                 "模型": (list(_ANALYSIS_MODELS.keys()), {
                     "default": "ACE-Step-Transcriber",
-                    "tooltip": "描述模型，MiDaShengLM-7B 的音乐描述质量最佳。",
+                    "tooltip": "描述模型，MiDaShengLM-7B 的音乐描述质量最佳。需提前手动下载到本节点 models/ 目录。",
                 }),
                 "提示词": ("STRING", {
                     "default": _DEFAULT_CAPTION_PROMPT,
