@@ -1,0 +1,143 @@
+{
+  "id": "comfyui-musicanalyzer-example",
+  "revision": 0,
+  "last_node_id": 5,
+  "last_link_id": 4,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadAudio",
+      "pos": [80, 0],
+      "size": [270, 136],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "AUDIO", "type": "AUDIO", "links": [1, 2, 3]}
+      ],
+      "properties": {"Node name for S&R": "LoadAudio"},
+      "widgets_values": ["请选择你的歌曲.MP3", null, ""],
+      "widgets_values_named": {"audio": "请选择你的歌曲.MP3", "upload": ""}
+    },
+    {
+      "id": 2,
+      "type": "MusicAnalyzer",
+      "pos": [450, -140],
+      "size": [320, 420],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [{"name": "音频", "type": "AUDIO", "link": 1}],
+      "outputs": [
+        {"name": "标签", "type": "STRING", "links": [4]},
+        {"name": "BPM", "type": "INT", "links": null},
+        {"name": "调性", "type": "STRING", "links": null},
+        {"name": "音乐信息JSON", "type": "STRING", "links": null}
+      ],
+      "properties": {"Node name for S&R": "MusicAnalyzer"},
+      "widgets_values": [true, true, true, 256, 60, true, false, 0, 1, 0, 1.1, 0, "randomize", "ACE-Step-Transcriber"],
+      "widgets_values_named": {
+        "提取标签": true,
+        "提取BPM": true,
+        "提取调性": true,
+        "最大生成长度": 256,
+        "音频时长": 60,
+        "用后卸载模型": true,
+        "使用Flash注意力": false,
+        "温度": 0,
+        "核采样top_p": 1,
+        "top_k": 0,
+        "重复惩罚": 1.1,
+        "随机种子": 0,
+        "控制随机种子": "randomize",
+        "模型": "ACE-Step-Transcriber"
+      }
+    },
+    {
+      "id": 3,
+      "type": "MusicTranscriber",
+      "pos": [450, 300],
+      "size": [320, 380],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{"name": "音频", "type": "AUDIO", "link": 2}],
+      "outputs": [{"name": "歌词", "type": "STRING", "links": null}],
+      "properties": {"Node name for S&R": "MusicTranscriber"},
+      "widgets_values": ["ACE-Step-Transcriber", "", 512, 60, true, false, 0, 1, 0, 1.1, 0, "randomize"],
+      "widgets_values_named": {
+        "模型": "ACE-Step-Transcriber",
+        "提示词": "",
+        "最大生成长度": 512,
+        "音频时长": 60,
+        "用后卸载模型": true,
+        "使用Flash注意力": false,
+        "温度": 0,
+        "核采样top_p": 1,
+        "top_k": 0,
+        "重复惩罚": 1.1,
+        "随机种子": 0,
+        "控制随机种子": "randomize"
+      }
+    },
+    {
+      "id": 4,
+      "type": "MusicCaptioner",
+      "pos": [450, 720],
+      "size": [320, 380],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [{"name": "音频", "type": "AUDIO", "link": 3}],
+      "outputs": [{"name": "描述", "type": "STRING", "links": null}],
+      "properties": {"Node name for S&R": "MusicCaptioner"},
+      "widgets_values": ["ACE-Step-Transcriber", "", 256, 60, true, false, 0, 1, 0, 1.1, 0, "randomize"],
+      "widgets_values_named": {
+        "模型": "ACE-Step-Transcriber",
+        "提示词": "",
+        "最大生成长度": 256,
+        "音频时长": 60,
+        "用后卸载模型": true,
+        "使用Flash注意力": false,
+        "温度": 0,
+        "核采样top_p": 1,
+        "top_k": 0,
+        "重复惩罚": 1.1,
+        "随机种子": 0,
+        "控制随机种子": "randomize"
+      }
+    },
+    {
+      "id": 5,
+      "type": "MusicInfoToJSON",
+      "pos": [880, 150],
+      "size": [320, 240],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "歌词", "type": "STRING", "link": null},
+        {"name": "标签", "type": "STRING", "link": 4},
+        {"name": "描述", "type": "STRING", "link": null},
+        {"name": "BPM", "type": "INT", "link": null},
+        {"name": "调性", "type": "STRING", "link": null},
+        {"name": "附加JSON", "type": "STRING", "link": null}
+      ],
+      "outputs": [{"name": "JSON", "type": "STRING", "links": null}],
+      "properties": {"Node name for S&R": "MusicInfoToJSON"},
+      "widgets_values": ["", "", "", 0, "", ""],
+      "widgets_values_named": {"歌词": "", "标签": "", "描述": "", "BPM": 0, "调性": "", "附加JSON": ""}
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "AUDIO"],
+    [2, 1, 0, 3, 0, "AUDIO"],
+    [3, 1, 0, 4, 0, "AUDIO"],
+    [4, 2, 0, 5, 1, "STRING"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {"ds": {"scale": 1, "offset": [0, 0]}, "frontendVersion": "1.49.6"},
+  "version": 0.4
+}

@@ -1,0 +1,5 @@
+transformers>=4.52.0
+torchaudio
+numpy
+soundfile
+librosa
