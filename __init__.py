@@ -9,7 +9,20 @@ ComfyUI-MusicAnalyzer —— 音乐理解与结构化描述节点包
 
 音频理解核心代码提取并重构自 ComfyUI-AceStep_SFT（MIT 协议），
 并新增了 MiDaShengLM / Qwen3-Omni 支持与结构化 JSON 输出节点。
+
+模型存放（ComfyUI 官方共用目录）：ComfyUI/models/audio_encoders/<模型名>/
 """
+
+import os
+
+import folder_paths
+
+# 使用 ComfyUI 官方注册的 audio_encoders 目录（models/audio_encoders/）。
+# 老版本 ComfyUI 若尚未注册，则补注册一次（幂等，路径相同，其他插件同样可共用）。
+if not folder_paths.get_folder_paths("audio_encoders"):
+    folder_paths.add_model_folder_path(
+        "audio_encoders", os.path.join(folder_paths.models_dir, "audio_encoders")
+    )
 
 from .nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
 
