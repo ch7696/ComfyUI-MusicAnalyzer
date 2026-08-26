@@ -1,0 +1,2117 @@
+{
+  "id": "comfyui-musicanalyzer-full-cover",
+  "revision": 0,
+  "last_node_id": 117,
+  "last_link_id": 47,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadAudio",
+      "pos": [
+        60,
+        0
+      ],
+      "size": [
+        270,
+        136
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "请选择你的歌曲.MP3",
+        null,
+        ""
+      ],
+      "widgets_values_named": {
+        "audio": "请选择你的歌曲.MP3",
+        "upload": ""
+      }
+    },
+    {
+      "id": 2,
+      "type": "MusicAnalyzer",
+      "pos": [
+        420,
+        -180
+      ],
+      "size": [
+        320,
+        420
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "音频",
+          "type": "AUDIO",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "标签",
+          "type": "STRING",
+          "links": [
+            4,
+            11,
+            23
+          ]
+        },
+        {
+          "name": "BPM",
+          "type": "INT",
+          "links": [
+            6,
+            24
+          ]
+        },
+        {
+          "name": "调性",
+          "type": "STRING",
+          "links": [
+            7,
+            25
+          ]
+        },
+        {
+          "name": "音乐信息JSON",
+          "type": "STRING",
+          "links": [
+            28
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicAnalyzer"
+      },
+      "widgets_values": [
+        true,
+        true,
+        true,
+        256,
+        60,
+        true,
+        false,
+        0,
+        1,
+        0,
+        1.1,
+        0,
+        "randomize",
+        "ACE-Step-Transcriber"
+      ],
+      "widgets_values_named": {
+        "提取标签": true,
+        "提取BPM": true,
+        "提取调性": true,
+        "最大生成长度": 256,
+        "音频时长": 60,
+        "用后卸载模型": true,
+        "使用Flash注意力": false,
+        "温度": 0,
+        "核采样top_p": 1,
+        "top_k": 0,
+        "重复惩罚": 1.1,
+        "随机种子": 0,
+        "控制随机种子": "randomize",
+        "模型": "ACE-Step-Transcriber"
+      }
+    },
+    {
+      "id": 3,
+      "type": "MusicTranscriber",
+      "pos": [
+        420,
+        260
+      ],
+      "size": [
+        320,
+        380
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "音频",
+          "type": "AUDIO",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "links": [
+            5,
+            26
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicTranscriber"
+      },
+      "widgets_values": [
+        "ACE-Step-Transcriber",
+        "",
+        512,
+        60,
+        true,
+        false,
+        0,
+        1,
+        0,
+        1.1,
+        0,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "模型": "ACE-Step-Transcriber",
+        "提示词": "",
+        "最大生成长度": 512,
+        "音频时长": 60,
+        "用后卸载模型": true,
+        "使用Flash注意力": false,
+        "温度": 0,
+        "核采样top_p": 1,
+        "top_k": 0,
+        "重复惩罚": 1.1,
+        "随机种子": 0,
+        "控制随机种子": "randomize"
+      }
+    },
+    {
+      "id": 4,
+      "type": "MusicCaptioner",
+      "pos": [
+        420,
+        680
+      ],
+      "size": [
+        320,
+        380
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "音频",
+          "type": "AUDIO",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "描述",
+          "type": "STRING",
+          "links": [
+            8,
+            27
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicCaptioner"
+      },
+      "widgets_values": [
+        "ACE-Step-Transcriber",
+        "",
+        256,
+        60,
+        true,
+        false,
+        0,
+        1,
+        0,
+        1.1,
+        0,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "模型": "ACE-Step-Transcriber",
+        "提示词": "",
+        "最大生成长度": 256,
+        "音频时长": 60,
+        "用后卸载模型": true,
+        "使用Flash注意力": false,
+        "温度": 0,
+        "核采样top_p": 1,
+        "top_k": 0,
+        "重复惩罚": 1.1,
+        "随机种子": 0,
+        "控制随机种子": "randomize"
+      }
+    },
+    {
+      "id": 5,
+      "type": "MusicInfoToMusic3",
+      "pos": [
+        850,
+        80
+      ],
+      "size": [
+        320,
+        230
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": 5
+        },
+        {
+          "name": "标签",
+          "type": "STRING",
+          "link": 4
+        },
+        {
+          "name": "描述",
+          "type": "STRING",
+          "link": 8
+        },
+        {
+          "name": "BPM",
+          "type": "INT",
+          "link": 6
+        },
+        {
+          "name": "调性",
+          "type": "STRING",
+          "link": 7
+        },
+        {
+          "name": "风格改写",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "结构化描述",
+          "type": "STRING",
+          "links": [
+            9,
+            17
+          ]
+        },
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "links": [
+            10,
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicInfoToMusic3"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 6,
+      "type": "Music3PromptAdapter",
+      "pos": [
+        1280,
+        60
+      ],
+      "size": [
+        300,
+        160
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "结构化描述",
+          "type": "STRING",
+          "link": 19
+        },
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": 20
+        }
+      ],
+      "outputs": [
+        {
+          "name": "caption",
+          "type": "STRING",
+          "links": [
+            30
+          ]
+        },
+        {
+          "name": "lyrics",
+          "type": "STRING",
+          "links": [
+            31
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicClipPrompt"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 7,
+      "type": "MusicInfoToLLMPrompt",
+      "pos": [
+        1280,
+        -380
+      ],
+      "size": [
+        340,
+        200
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "结构化描述",
+          "type": "STRING",
+          "link": 9
+        },
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": 10
+        },
+        {
+          "name": "风格提示词",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "原始标签",
+          "type": "STRING",
+          "link": 11
+        },
+        {
+          "name": "附加信息",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "指令文本",
+          "type": "STRING",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicInfoToLLMPrompt"
+      },
+      "widgets_values": [
+        "改成赛博朋克摇滚风格，女声，更快节奏"
+      ],
+      "widgets_values_named": {
+        "风格提示词": "改成赛博朋克摇滚风格，女声，更快节奏"
+      }
+    },
+    {
+      "id": 9,
+      "type": "CLIPLoader",
+      "pos": [
+        1280,
+        -120
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen3vl_4b_heretic_fp8.safetensors",
+        "stable_diffusion",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3vl_4b_heretic_fp8.safetensors",
+        "type": "stable_diffusion",
+        "device": "default"
+      }
+    },
+    {
+      "id": 10,
+      "type": "TextGenerate",
+      "pos": [
+        1280,
+        120
+      ],
+      "size": [
+        420,
+        300
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 14
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": 13
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "video",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "generated_text",
+          "type": "STRING",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextGenerate"
+      },
+      "widgets_values": [
+        "",
+        1024,
+        {
+          "sampling_mode": "on",
+          "temperature": 0.7,
+          "top_k": 64,
+          "top_p": 0.95,
+          "min_p": 0.05,
+          "repetition_penalty": 1.05,
+          "seed": 0,
+          "presence_penalty": 0.0
+        },
+        false,
+        true
+      ],
+      "widgets_values_named": {
+        "prompt": "",
+        "max_length": 1024,
+        "sampling_mode": {
+          "sampling_mode": "on",
+          "temperature": 0.7,
+          "top_k": 64,
+          "top_p": 0.95,
+          "min_p": 0.05,
+          "repetition_penalty": 1.05,
+          "seed": 0,
+          "presence_penalty": 0.0
+        },
+        "thinking": false,
+        "use_default_template": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "MusicLLMToMusic3",
+      "pos": [
+        1280,
+        480
+      ],
+      "size": [
+        340,
+        200
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "LLM输出文本",
+          "type": "STRING",
+          "link": 16
+        },
+        {
+          "name": "兜底描述",
+          "type": "STRING",
+          "link": 17
+        },
+        {
+          "name": "兜底歌词",
+          "type": "STRING",
+          "link": 18
+        }
+      ],
+      "outputs": [
+        {
+          "name": "caption",
+          "type": "STRING",
+          "links": [
+            19
+          ]
+        },
+        {
+          "name": "lyrics",
+          "type": "STRING",
+          "links": [
+            20,
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MusicLLMToMusic3"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 101,
+      "type": "UNETLoader",
+      "pos": [
+        700,
+        380
+      ],
+      "size": [
+        480,
+        90
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "showAdvanced": false,
+      "inputs": [
+        {
+          "localized_name": "UNet名称",
+          "name": "unet_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "unet_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "模型",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "models": [
+          {
+            "name": "minimax_music3_dit_fp16.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/MiniMax-Music-3/resolve/main/diffusion_models/minimax_music3_dit_fp16.safetensors",
+            "directory": "diffusion_models"
+          }
+        ]
+      },
+      "widgets_values": [
+        "minimax_music3_dit_int8_convrot.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "minimax_music3_dit_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 102,
+      "type": "CLIPLoader",
+      "pos": [
+        700,
+        550
+      ],
+      "size": [
+        480,
+        120
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "CLIP名称",
+          "name": "clip_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "clip_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "CLIP",
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            32
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "models": [
+          {
+            "name": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/MiniMax-Music-3/resolve/main/text_encoders/minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+            "directory": "text_encoders"
+          }
+        ]
+      },
+      "widgets_values": [
+        "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+        "minimax",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "minimax_music3_text_encoder_pruned_int8_convrot.safetensors",
+        "type": "minimax",
+        "device": "default"
+      }
+    },
+    {
+      "id": 103,
+      "type": "VAELoader",
+      "pos": [
+        700,
+        750
+      ],
+      "size": [
+        480,
+        70
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "vae名称",
+          "name": "vae_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "vae_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "VAE",
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            42,
+            44
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0",
+        "models": [
+          {
+            "name": "minimax_music3_dav.safetensors",
+            "url": "https://huggingface.co/Comfy-Org/MiniMax-Music-3/resolve/main/vae/minimax_music3_dav.safetensors",
+            "directory": "vae"
+          }
+        ]
+      },
+      "widgets_values": [
+        "minimax_music3_dav.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "minimax_music3_dav.safetensors"
+      }
+    },
+    {
+      "id": 104,
+      "type": "MiniMaxMusic3TextEncode",
+      "pos": [
+        1231.140625,
+        380
+      ],
+      "size": [
+        500,
+        750
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "showAdvanced": true,
+      "inputs": [
+        {
+          "localized_name": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "link": 32
+        },
+        {
+          "localized_name": "caption",
+          "name": "caption",
+          "type": "STRING",
+          "widget": {
+            "name": "caption"
+          },
+          "link": 30
+        },
+        {
+          "localized_name": "lyrics",
+          "name": "lyrics",
+          "type": "STRING",
+          "widget": {
+            "name": "lyrics"
+          },
+          "link": 31
+        },
+        {
+          "localized_name": "seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 38
+        },
+        {
+          "localized_name": "max_duration",
+          "name": "max_duration",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_duration"
+          },
+          "link": 22
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "条件",
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            33,
+            34
+          ]
+        },
+        {
+          "localized_name": "seconds",
+          "name": "seconds",
+          "type": "FLOAT",
+          "links": [
+            36
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MiniMaxMusic3TextEncode",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        "",
+        "",
+        222,
+        "fixed",
+        60,
+        1.7,
+        50
+      ],
+      "widgets_values_named": {
+        "caption": "",
+        "lyrics": "",
+        "seed": 222,
+        "control_after_generate": "fixed",
+        "max_duration": 60,
+        "cfg_scale": 1.7,
+        "top_k": 50
+      }
+    },
+    {
+      "id": 105,
+      "type": "ConditioningZeroOut",
+      "pos": [
+        1820,
+        540
+      ],
+      "size": [
+        230,
+        40
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "条件",
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 33
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "条件",
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            35
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ConditioningZeroOut",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      }
+    },
+    {
+      "id": 106,
+      "type": "KSampler",
+      "pos": [
+        2170,
+        380
+      ],
+      "size": [
+        370,
+        270
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "模型",
+          "name": "model",
+          "type": "MODEL",
+          "link": 40
+        },
+        {
+          "localized_name": "正面条件",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 34
+        },
+        {
+          "localized_name": "负面条件",
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 35
+        },
+        {
+          "localized_name": "Latent图像",
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 37
+        },
+        {
+          "localized_name": "种子",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": 39
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "Latent",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            41,
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        1111111112,
+        "fixed",
+        30,
+        1.7,
+        "euler",
+        "simple",
+        1
+      ],
+      "widgets_values_named": {
+        "seed": 1111111112,
+        "control_after_generate": "fixed",
+        "steps": 30,
+        "cfg": 1.7,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "denoise": 1
+      }
+    },
+    {
+      "id": 107,
+      "type": "VAEDecodeAudio",
+      "pos": [
+        2590,
+        380
+      ],
+      "size": [
+        230,
+        60
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "Latent",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 41
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 42
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "音频",
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecodeAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      }
+    },
+    {
+      "id": 108,
+      "type": "EmptyMiniMaxMusic3LatentAudio",
+      "pos": [
+        1780,
+        380
+      ],
+      "size": [
+        350,
+        90
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "seconds",
+          "name": "seconds",
+          "type": "FLOAT",
+          "widget": {
+            "name": "seconds"
+          },
+          "link": 36
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "Latent",
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            37
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyMiniMaxMusic3LatentAudio",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        120,
+        1
+      ],
+      "widgets_values_named": {
+        "seconds": 120,
+        "batch_size": 1
+      }
+    },
+    {
+      "id": 109,
+      "type": "SeedNode",
+      "pos": [
+        890,
+        970
+      ],
+      "size": [
+        270,
+        90
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "种子",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "种子",
+          "name": "seed",
+          "type": "INT",
+          "links": [
+            38,
+            39
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SeedNode",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        0,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "seed": 0,
+        "fixed": "randomize"
+      }
+    },
+    {
+      "id": 110,
+      "type": "VAEDecodeAudioTiled",
+      "pos": [
+        2580,
+        500
+      ],
+      "size": [
+        280,
+        110
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "样本",
+          "name": "samples",
+          "type": "LATENT",
+          "link": 43
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "音频",
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            46
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecodeAudioTiled",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        1536,
+        64
+      ],
+      "widgets_values_named": {
+        "tile_size": 1536,
+        "overlap": 64
+      }
+    },
+    {
+      "id": 111,
+      "type": "ComfySwitchNode",
+      "pos": [
+        2600,
+        690
+      ],
+      "size": [
+        270,
+        110
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "为假时",
+          "name": "on_false",
+          "type": "AUDIO",
+          "link": 45
+        },
+        {
+          "localized_name": "为真时",
+          "name": "on_true",
+          "type": "AUDIO",
+          "link": 46
+        },
+        {
+          "localized_name": "切换",
+          "name": "switch",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "switch"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "输出",
+          "name": "output",
+          "type": "AUDIO",
+          "links": [
+            47
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfySwitchNode",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        true
+      ],
+      "widgets_values_named": {
+        "switch": true
+      }
+    },
+    {
+      "id": 112,
+      "type": "SaveAudioAdvanced",
+      "pos": [
+        2150,
+        630
+      ],
+      "size": [
+        750,
+        160
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 47
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveAudioAdvanced",
+        "cnr_id": "comfy-core",
+        "ver": "0.31.0"
+      },
+      "widgets_values": [
+        "audio/audio_minimax_music3",
+        "mp3",
+        "V0"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "audio/audio_minimax_music3",
+        "format": "mp3",
+        "format.quality": "V0"
+      }
+    },
+    {
+      "id": 113,
+      "type": "TextPreview",
+      "pos": [
+        1280,
+        -380
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextPreview"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 114,
+      "type": "TextPreview",
+      "pos": [
+        1280,
+        40
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextPreview"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 115,
+      "type": "LyricsDurationEstimator",
+      "pos": [
+        1600,
+        480
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "基准时长",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "参考句数",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "每句修正秒数",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "最小时长",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "最大时长",
+          "type": "FLOAT",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "秒数",
+          "type": "FLOAT",
+          "links": []
+        },
+        {
+          "name": "整秒",
+          "type": "INT",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LyricsDurationEstimator"
+      },
+      "widgets_values": [
+        150.0,
+        24,
+        2.0,
+        90.0,
+        240.0
+      ],
+      "widgets_values_named": {
+        "基准时长": 150.0,
+        "参考句数": 24,
+        "每句修正秒数": 2.0,
+        "最小时长": 90.0,
+        "最大时长": 240.0
+      }
+    },
+    {
+      "id": 115,
+      "type": "LyricsDurationEstimator",
+      "pos": [
+        1600,
+        480
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": 21
+        },
+        {
+          "name": "基准时长",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "参考句数",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "每句修正秒数",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "最小时长",
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "name": "最大时长",
+          "type": "FLOAT",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "秒数",
+          "type": "FLOAT",
+          "links": [
+            22
+          ]
+        },
+        {
+          "name": "整秒",
+          "type": "INT",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LyricsDurationEstimator"
+      },
+      "widgets_values": [
+        150.0,
+        24,
+        2.0,
+        90.0,
+        240.0
+      ],
+      "widgets_values_named": {
+        "基准时长": 150.0,
+        "参考句数": 24,
+        "每句修正秒数": 2.0,
+        "最小时长": 90.0,
+        "最大时长": 240.0
+      }
+    },
+    {
+      "id": 116,
+      "type": "AnalysisOverview",
+      "pos": [
+        40,
+        900
+      ],
+      "size": [
+        360,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "标签",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "BPM",
+          "type": "INT",
+          "link": null
+        },
+        {
+          "name": "调性",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "描述",
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "name": "音乐信息JSON",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "总览文本",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AnalysisOverview"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 117,
+      "type": "TextPreview",
+      "pos": [
+        420,
+        900
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextPreview"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 116,
+      "type": "AnalysisOverview",
+      "pos": [
+        40,
+        900
+      ],
+      "size": [
+        360,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "标签",
+          "type": "STRING",
+          "link": 23
+        },
+        {
+          "name": "BPM",
+          "type": "INT",
+          "link": 24
+        },
+        {
+          "name": "调性",
+          "type": "STRING",
+          "link": 25
+        },
+        {
+          "name": "歌词",
+          "type": "STRING",
+          "link": 26
+        },
+        {
+          "name": "描述",
+          "type": "STRING",
+          "link": 27
+        },
+        {
+          "name": "音乐信息JSON",
+          "type": "STRING",
+          "link": 28
+        }
+      ],
+      "outputs": [
+        {
+          "name": "总览文本",
+          "type": "STRING",
+          "links": [
+            29
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "AnalysisOverview"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    },
+    {
+      "id": 117,
+      "type": "TextPreview",
+      "pos": [
+        420,
+        900
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "link": 29
+        }
+      ],
+      "outputs": [
+        {
+          "name": "文本",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextPreview"
+      },
+      "widgets_values": [],
+      "widgets_values_named": {}
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "AUDIO"
+    ],
+    [
+      2,
+      1,
+      0,
+      3,
+      0,
+      "AUDIO"
+    ],
+    [
+      3,
+      1,
+      0,
+      4,
+      0,
+      "AUDIO"
+    ],
+    [
+      4,
+      2,
+      0,
+      5,
+      1,
+      "STRING"
+    ],
+    [
+      5,
+      3,
+      0,
+      5,
+      0,
+      "STRING"
+    ],
+    [
+      6,
+      2,
+      1,
+      5,
+      3,
+      "INT"
+    ],
+    [
+      7,
+      2,
+      2,
+      5,
+      4,
+      "STRING"
+    ],
+    [
+      8,
+      4,
+      0,
+      5,
+      2,
+      "STRING"
+    ],
+    [
+      9,
+      5,
+      0,
+      7,
+      0,
+      "STRING"
+    ],
+    [
+      10,
+      5,
+      1,
+      7,
+      1,
+      "STRING"
+    ],
+    [
+      11,
+      2,
+      0,
+      7,
+      3,
+      "STRING"
+    ],
+    [
+      12,
+      7,
+      0,
+      113,
+      0,
+      "STRING"
+    ],
+    [
+      13,
+      113,
+      0,
+      10,
+      1,
+      "STRING"
+    ],
+    [
+      14,
+      9,
+      0,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      15,
+      10,
+      0,
+      114,
+      0,
+      "STRING"
+    ],
+    [
+      16,
+      114,
+      0,
+      8,
+      0,
+      "STRING"
+    ],
+    [
+      17,
+      5,
+      0,
+      8,
+      1,
+      "STRING"
+    ],
+    [
+      18,
+      5,
+      1,
+      8,
+      2,
+      "STRING"
+    ],
+    [
+      19,
+      8,
+      0,
+      6,
+      0,
+      "STRING"
+    ],
+    [
+      20,
+      8,
+      1,
+      6,
+      1,
+      "STRING"
+    ],
+    [
+      21,
+      8,
+      1,
+      115,
+      0,
+      "STRING"
+    ],
+    [
+      22,
+      115,
+      0,
+      104,
+      4,
+      "FLOAT"
+    ],
+    [
+      23,
+      2,
+      0,
+      116,
+      0,
+      "STRING"
+    ],
+    [
+      24,
+      2,
+      1,
+      116,
+      1,
+      "INT"
+    ],
+    [
+      25,
+      2,
+      2,
+      116,
+      2,
+      "STRING"
+    ],
+    [
+      26,
+      3,
+      0,
+      116,
+      3,
+      "STRING"
+    ],
+    [
+      27,
+      4,
+      0,
+      116,
+      4,
+      "STRING"
+    ],
+    [
+      28,
+      2,
+      3,
+      116,
+      5,
+      "STRING"
+    ],
+    [
+      29,
+      116,
+      0,
+      117,
+      0,
+      "STRING"
+    ],
+    [
+      30,
+      6,
+      0,
+      104,
+      1,
+      "STRING"
+    ],
+    [
+      31,
+      6,
+      1,
+      104,
+      2,
+      "STRING"
+    ],
+    [
+      32,
+      102,
+      0,
+      104,
+      0,
+      "CLIP"
+    ],
+    [
+      33,
+      104,
+      0,
+      105,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      34,
+      104,
+      0,
+      106,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      35,
+      105,
+      0,
+      106,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      36,
+      104,
+      1,
+      108,
+      0,
+      "FLOAT"
+    ],
+    [
+      37,
+      108,
+      0,
+      106,
+      3,
+      "LATENT"
+    ],
+    [
+      38,
+      109,
+      0,
+      104,
+      3,
+      "INT"
+    ],
+    [
+      39,
+      109,
+      0,
+      106,
+      4,
+      "INT"
+    ],
+    [
+      40,
+      101,
+      0,
+      106,
+      0,
+      "MODEL"
+    ],
+    [
+      41,
+      106,
+      0,
+      107,
+      0,
+      "LATENT"
+    ],
+    [
+      42,
+      103,
+      0,
+      107,
+      1,
+      "VAE"
+    ],
+    [
+      43,
+      106,
+      0,
+      110,
+      0,
+      "LATENT"
+    ],
+    [
+      44,
+      103,
+      0,
+      110,
+      1,
+      "VAE"
+    ],
+    [
+      45,
+      107,
+      0,
+      111,
+      0,
+      "AUDIO"
+    ],
+    [
+      46,
+      110,
+      0,
+      111,
+      1,
+      "AUDIO"
+    ],
+    [
+      47,
+      111,
+      0,
+      112,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.9,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "frontendVersion": "1.49.6"
+  },
+  "version": 0.4
+}
