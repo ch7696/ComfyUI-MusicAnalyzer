@@ -8,7 +8,7 @@ ComfyUI-MusicAnalyzer —— 音乐理解与结构化描述节点（仅分析，
   - 音乐描述器：面向文生音乐模型的自然语言描述
   - 音乐信息转JSON：把各部分汇总为一个结构化 JSON
 
-模型支持（需手动下载到本节点 models/ 目录，不会自动下载）：
+模型支持（需手动下载到 ComfyUI 官方共用目录 models/audio_encoders/<模型名>/，不会自动下载）：
   - ACE-Step-Transcriber（默认，Qwen2.5-Omni 架构，歌词/结构/声乐）
   - Qwen2-Audio-7B-Instruct
   - Qwen2.5-Omni-3B / 7B，Ke-Omni-R-3B，Qwen3-Omni-8B
@@ -40,6 +40,7 @@ _ANALYSIS_MODELS = {
     "Qwen3-Omni-8B": "Qwen/Qwen3-Omni-8B",
     "MiDaShengLM-7B": "mispeech/midashenglm-7b-0804-bf16",
     "MiDaShengLM-7B-GPTQ": "mispeech/midashenglm-7b-0804-w4a16-gptq",
+    "MiDaShengLM-7B-FP8": "mispeech/midashenglm-7b-0804-fp8",
     "Whisper-large-v3-transcription": "openai/whisper-large-v3",
     "Whisper-large-v3-turbo-transcription": "openai/whisper-large-v3-turbo",
     "Distil-Whisper-large-v3.5-transcription": "distil-whisper/distil-large-v3.5",
@@ -75,29 +76,79 @@ _audio_model_name = None
 _audio_tokenizer = None  # 仅 MiDaShengLM 使用
 
 
-def _get_model_dir(model_key):
-    """返回模型在本节点目录下的本地路径。"""
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", model_key)
+def _patch_qwen_omni_padding(model, processor):
+    """补齐 Transformers 5.x 与 Qwen2.5-Omni talker 配置之间的兼容字段。
+
+    部分 Qwen2.5-Omni 检查点的 talker_config 没有 pad_token_id，
+    但新版 generate() 会无条件读取它，导致三类分析请求在生成前直接失败。
+    """
+    tokenizer = getattr(processor, "tokenizer", None)
+    pad_id = getattr(tokenizer, "pad_token_id", None)
+    if pad_id is None:
+        pad_id = getattr(tokenizer, "eos_token_id", None)
+    if pad_id is None:
+        # Qwen tokenizer 的常见 EOS/PAD fallback；只在 tokenizer 未提供时使用。
+        pad_id = 151643
+    for config in (
+        getattr(model, "config", None),
+        getattr(model, "generation_config", None),
+        getattr(getattr(model, "talker", None), "config", None),
+        getattr(getattr(model, "talker", None), "generation_config", None),
+    ):
+        if config is not None:
+            try:
+                setattr(config, "pad_token_id", int(pad_id))
+            except Exception:
+                pass
+    print(f"[MusicAnalyzer] Qwen2.5-Omni pad_token_id={pad_id}")
+
+
+def _qwen_pad_id(processor):
+    tokenizer = getattr(processor, "tokenizer", None)
+    return getattr(tokenizer, "pad_token_id", None) or getattr(tokenizer, "eos_token_id", None) or 151643
+
+
+def _get_model_search_dirs():
+    """模型查找目录列表：ComfyUI 官方 audio_encoders 目录优先，插件本地 models/ 回退。"""
+    dirs = []
+    try:
+        import folder_paths
+        # ComfyUI 官方注册的音频模型目录：models/audio_encoders/
+        dirs.extend(folder_paths.get_folder_paths("audio_encoders"))
+    except Exception:
+        pass
+    local_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+    if local_dir not in dirs:
+        dirs.append(local_dir)
+    return dirs
+
+
+def _find_model_dir(model_key):
+    """在官方共用目录与插件本地目录中查找模型，返回第一个存在的目录。"""
+    for base in _get_model_search_dirs():
+        candidate = os.path.join(base, model_key)
+        if os.path.isfile(os.path.join(candidate, "config.json")):
+            return candidate
+    return None
 
 
 def _check_model_local(model_key):
-    """检查模型是否已手动下载到节点目录（不做自动下载）。
+    """检查模型是否已手动下载（不做自动下载）。
 
-    模型须手动放到 models/<模型名>/ 下（需包含 config.json）。
+    优先在 ComfyUI 官方共用目录 models/audio_encoders/<模型名>/ 查找，
+    其次回退到插件本地 models/<模型名>/。
     """
-    model_dir = _get_model_dir(model_key)
-    config_path = os.path.join(model_dir, "config.json")
-    if os.path.isfile(config_path):
+    model_dir = _find_model_dir(model_key)
+    if model_dir is not None:
         return model_dir
     repo_id = _ANALYSIS_MODELS[model_key]
+    search_dirs = "\n  ".join(_get_model_search_dirs())
     raise RuntimeError(
-        f"[MusicAnalyzer] 模型 {model_key} 未找到，请手动下载后放入：\n"
-        f"  目录：{model_dir}\n"
+        f"[MusicAnalyzer] 模型 {model_key} 未找到，已查找以下目录：\n"
+        f"  {search_dirs}\n"
+        f"请手动下载后放入其中任一目录（子目录名须为 {model_key}）：\n"
         f"下载命令（国内网络建议先执行 set HF_ENDPOINT=https://hf-mirror.com）：\n"
-        f"  huggingface-cli download {repo_id} --local-dir \"{model_dir}\"\n"
-        f"或使用 Python：\n"
-        f"  python -c \"from huggingface_hub import snapshot_download; "
-        f"snapshot_download('{repo_id}', local_dir=r'{model_dir}')\""
+        f"  huggingface-cli download {repo_id} --local-dir \"<上面的任一目录>\\{model_key}\""
     )
 
 
@@ -112,6 +163,33 @@ def _get_analysis_device():
 
 def _get_analysis_device_map():
     return {"": str(_get_analysis_device())}
+
+
+# 本地没有任何模型时下拉列表的占位项
+_PLACEHOLDER_MODEL = "（请先下载模型到 models/audio_encoders/）"
+
+
+def _get_local_model_keys():
+    """只返回本地已下载（存在 config.json）的模型 key。
+
+    下载新模型后，在 ComfyUI 里重新添加节点或刷新页面即可看到更新。
+    """
+    keys = [k for k in _ANALYSIS_MODELS if _find_model_dir(k) is not None]
+    if not keys:
+        keys = [_PLACEHOLDER_MODEL]
+    return keys
+
+
+def _model_default():
+    """默认模型：优先 ACE-Step-Transcriber，本地没有则取列表第一个。"""
+    keys = _get_local_model_keys()
+    if _NATIVE_ANALYSIS_MODEL in keys:
+        return _NATIVE_ANALYSIS_MODEL
+    return keys[0]
+
+
+def _is_placeholder(model_key):
+    return model_key == _PLACEHOLDER_MODEL
 
 
 def _load_audio_model(model_key, use_flash_attn=False):
@@ -136,24 +214,40 @@ def _load_audio_model(model_key, use_flash_attn=False):
 
     if _is_acestep_transcriber_model(model_key):
         import warnings
-        from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
+        from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor, Qwen2_5OmniConfig
+        omni_config = Qwen2_5OmniConfig.from_pretrained(model_dir)
+        # Transformers 5.x expects this field while constructing the talker,
+        # but older Qwen2.5-Omni checkpoints omit it from talker_config.
+        if getattr(omni_config.talker_config, "pad_token_id", None) is None:
+            # Talker vocab is 8448; the main Qwen tokenizer PAD (151643) is
+            # outside that range and would fail nn.Embedding construction.
+            omni_config.talker_config.pad_token_id = getattr(
+                omni_config.talker_config, "tts_codec_pad_token_id", 8292
+            )
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*Flash Attention 2 without specifying a torch dtype.*")
             warnings.filterwarnings("ignore", message=".*Token2WavModel.*fallback.*")
-            _audio_model = Qwen2_5OmniForConditionalGeneration.from_pretrained(model_dir, **load_kwargs)
+            _audio_model = Qwen2_5OmniForConditionalGeneration.from_pretrained(model_dir, config=omni_config, **load_kwargs)
         _audio_model.disable_talker()
         _audio_model.eval()
         _audio_processor = Qwen2_5OmniProcessor.from_pretrained(model_dir, use_fast=False)
+        _patch_qwen_omni_padding(_audio_model, _audio_processor)
     elif model_key.startswith("Qwen2.5-Omni"):
         import warnings
-        from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
+        from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor, Qwen2_5OmniConfig
+        omni_config = Qwen2_5OmniConfig.from_pretrained(model_dir)
+        if getattr(omni_config.talker_config, "pad_token_id", None) is None:
+            omni_config.talker_config.pad_token_id = getattr(
+                omni_config.talker_config, "tts_codec_pad_token_id", 8292
+            )
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*Flash Attention 2 without specifying a torch dtype.*")
             warnings.filterwarnings("ignore", message=".*Token2WavModel.*fallback.*")
-            _audio_model = Qwen2_5OmniForConditionalGeneration.from_pretrained(model_dir, **load_kwargs)
+            _audio_model = Qwen2_5OmniForConditionalGeneration.from_pretrained(model_dir, config=omni_config, **load_kwargs)
         _audio_model.disable_talker()
         _audio_model.eval()
         _audio_processor = Qwen2_5OmniProcessor.from_pretrained(model_dir, use_fast=False)
+        _patch_qwen_omni_padding(_audio_model, _audio_processor)
     elif model_key == "Qwen2-Audio-7B-Instruct":
         from transformers import Qwen2AudioForConditionalGeneration, AutoProcessor
         _audio_model = Qwen2AudioForConditionalGeneration.from_pretrained(model_dir, **load_kwargs)
@@ -172,22 +266,30 @@ def _load_audio_model(model_key, use_flash_attn=False):
     elif model_key.startswith("MiDaShengLM"):
         import warnings
         from transformers import AutoModelForCausalLM, AutoProcessor, AutoTokenizer
+        # BF16 版显式用 bf16；GPTQ / FP8 量化版不指定 dtype，交给量化配置决定
+        midasheng_kwargs = dict(
+            trust_remote_code=True,
+            device_map=_get_analysis_device_map(),
+            low_cpu_mem_usage=True,
+            use_safetensors=True,
+        )
+        if "GPTQ" not in model_key and "FP8" not in model_key:
+            midasheng_kwargs["torch_dtype"] = torch.bfloat16
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*Flash Attention.*")
             try:
-                _audio_model = AutoModelForCausalLM.from_pretrained(
-                    model_dir,
-                    trust_remote_code=True,
-                    torch_dtype=torch.bfloat16,
-                    device_map=_get_analysis_device_map(),
-                    low_cpu_mem_usage=True,
-                    use_safetensors=True,
-                )
+                _audio_model = AutoModelForCausalLM.from_pretrained(model_dir, **midasheng_kwargs)
             except Exception as e:
-                if "gptq" in str(e).lower() or "quantization" in str(e).lower() or "auto_gptq" in str(e).lower():
+                msg_lower = str(e).lower()
+                if "gptq" in msg_lower or "quantization" in msg_lower or "auto_gptq" in msg_lower:
                     raise RuntimeError(
                         "[MusicAnalyzer] MiDaShengLM GPTQ 版本需要安装 auto-gptq（pip install auto-gptq），"
                         "或改用 MiDaShengLM-7B（BF16）版本。"
+                    ) from e
+                if "fp8" in msg_lower or "float8" in msg_lower:
+                    raise RuntimeError(
+                        "[MusicAnalyzer] MiDaShengLM FP8 版本加载失败（FP8 需要较新的 PyTorch/GPU 支持），"
+                        "可改用 MiDaShengLM-7B（BF16）或 GPTQ 版本。"
                     ) from e
                 raise
         _audio_model.eval()
@@ -409,9 +511,11 @@ def _extract_tags_qwen_omni(audio_dict, model, processor, max_new_tokens, audio_
     inputs = inputs.to(model.device).to(model.dtype)
     input_len = inputs["input_ids"].shape[-1]
     gk = {"max_new_tokens": max_new_tokens}
-    if hasattr(model, "talker"):
-        gk["return_audio"] = False
-        gk["use_audio_in_video"] = True
+    # Transformers 5 renamed return_audio to generation_mode. Explicit text
+    # mode is required after the talker is disabled to avoid audio generation.
+    gk["generation_mode"] = "text"
+    gk["use_audio_in_video"] = True
+    gk["pad_token_id"] = int(_qwen_pad_id(processor))
     gk.update(gen_kwargs or {})
     if "repetition_penalty" not in gk:
         gk["repetition_penalty"] = 1.5
@@ -440,6 +544,7 @@ def _extract_tags_qwen3_omni(audio_dict, model, processor, max_new_tokens, audio
     inputs = inputs.to(model.device).to(model.dtype)
     input_len = inputs["input_ids"].shape[-1]
     gk = {"max_new_tokens": max_new_tokens}
+    gk["pad_token_id"] = int(_qwen_pad_id(processor))
     gk.update(gen_kwargs)
     with torch.inference_mode():
         text_ids = model.generate(**inputs, **gk)
@@ -946,8 +1051,8 @@ def _detect_bpm_keyscale(audio_dict):
 # 给模型的默认指令（保持英文以保证各模型输出稳定，界面提示为中文）
 _DEFAULT_TRANSCRIBE_PROMPT = (
     "Transcribe this song completely. Output ONLY the verbatim lyrics, "
-    "organized by song sections (intro, verse, pre-chorus, chorus, bridge, outro). "
-    "Do not add any commentary."
+    "in singing order with natural line breaks. Do not infer or add section labels, "
+    "metadata, or commentary."
 )
 
 _DEFAULT_CAPTION_PROMPT = (
@@ -1024,9 +1129,16 @@ def _generate_text(audio_dict, model_key, user_text, max_new_tokens, audio_durat
     input_len = inputs["input_ids"].shape[-1]
     gk = {"max_new_tokens": max_new_tokens}
     gk.update(gen_kwargs)
-    if hasattr(model, "talker"):
-        gk.setdefault("return_audio", False)
+    if model_key.startswith("Qwen2.5-Omni") or _is_acestep_transcriber_model(model_key):
+        # The plugin disables the talker to save VRAM; force text-only mode
+        # even when the model no longer exposes a talker attribute.
+        gk.setdefault("generation_mode", "text")
         gk.setdefault("use_audio_in_video", True)
+        gk.setdefault("pad_token_id", int(_qwen_pad_id(processor)))
+    elif hasattr(model, "talker"):
+        gk.setdefault("generation_mode", "text")
+        gk.setdefault("use_audio_in_video", True)
+        gk.setdefault("pad_token_id", int(_qwen_pad_id(processor)))
     with torch.inference_mode():
         text_ids = model.generate(**inputs, **gk)
     new_tokens = text_ids[:, input_len:]
@@ -1034,7 +1146,6 @@ def _generate_text(audio_dict, model_key, user_text, max_new_tokens, audio_durat
     return raw[0].strip() if raw else ""
 
 
-# ===========================================================================
 # 8. 标签分类词表（供「音乐信息转JSON」做尽力分类）
 # ===========================================================================
 
@@ -1115,7 +1226,7 @@ class MusicAnalyzer:
             },
             "optional": {
                 "最大生成长度": ("INT", {
-                    "default": 256, "min": 64, "max": 2000, "step": 16,
+                    "default": 512, "min": 64, "max": 2000, "step": 16,
                     "tooltip": "标签生成的最大 token 数。",
                 }),
                 "音频时长": ("INT", {
@@ -1151,9 +1262,9 @@ class MusicAnalyzer:
                     "control_after_generate": True,
                     "tooltip": "采样种子。",
                 }),
-                "模型": (list(_ANALYSIS_MODELS.keys()), {
-                    "default": _NATIVE_ANALYSIS_MODEL,
-                    "tooltip": "用于标签提取的音频理解模型，需提前手动下载到本节点 models/ 目录。",
+                "模型": (_get_local_model_keys(), {
+                    "default": _model_default(),
+                    "tooltip": "用于标签提取的音频理解模型（只显示本地已下载的，下载新模型后刷新页面或重建节点）。",
                 }),
             },
         }
@@ -1177,13 +1288,15 @@ class MusicAnalyzer:
         detected_bpm = 0
         keyscale = ""
         model_key = 模型
+        if _is_placeholder(model_key):
+            print("[MusicAnalyzer] 未检测到任何已下载模型，请先下载到 models/audio_encoders/ 目录。")
 
         torch.manual_seed(随机种子)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(随机种子)
         gen_kwargs = _build_gen_kwargs(温度, 核采样top_p, top_k, 重复惩罚, 随机种子)
 
-        if 提取标签:
+        if 提取标签 and not _is_placeholder(model_key):
             try:
                 tags = _extract_tags(音频, model_key, 最大生成长度, 音频时长,
                                      use_flash_attn=使用Flash注意力, gen_kwargs=gen_kwargs)
@@ -1224,9 +1337,9 @@ class MusicTranscriber:
                 "音频": ("AUDIO", {"tooltip": "要转录歌词的音频。"}),
             },
             "optional": {
-                "模型": (list(_ANALYSIS_MODELS.keys()), {
-                    "default": "ACE-Step-Transcriber",
-                    "tooltip": "转录模型，Whisper 系列最省显存。需提前手动下载到本节点 models/ 目录。",
+                "模型": (_get_local_model_keys(), {
+                    "default": _model_default(),
+                    "tooltip": "转录模型（只显示本地已下载的）。Whisper 系列最省显存。",
                 }),
                 "提示词": ("STRING", {
                     "default": _DEFAULT_TRANSCRIBE_PROMPT,
@@ -1234,7 +1347,7 @@ class MusicTranscriber:
                     "tooltip": "发给模型的指令，可自行修改调整转录风格。",
                 }),
                 "最大生成长度": ("INT", {
-                    "default": 512, "min": 64, "max": 4000, "step": 16,
+                    "default": 2048, "min": 64, "max": 4000, "step": 16,
                     "tooltip": "生成歌词的最大 token 数。",
                 }),
                 "音频时长": ("INT", {
@@ -1269,6 +1382,9 @@ class MusicTranscriber:
     def transcribe(self, 音频, 模型="ACE-Step-Transcriber", 提示词=_DEFAULT_TRANSCRIBE_PROMPT,
                    最大生成长度=512, 音频时长=60, 用后卸载模型=True, 使用Flash注意力=False,
                    温度=0.0, 核采样top_p=1.0, top_k=0, 重复惩罚=1.1, 随机种子=0):
+        if _is_placeholder(模型):
+            print("[MusicAnalyzer] 未检测到任何已下载模型，请先下载到 models/audio_encoders/ 目录。")
+            return ("",)
         torch.manual_seed(随机种子)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(随机种子)
@@ -1295,9 +1411,9 @@ class MusicCaptioner:
                 "音频": ("AUDIO", {"tooltip": "要描述的音频。"}),
             },
             "optional": {
-                "模型": (list(_ANALYSIS_MODELS.keys()), {
-                    "default": "ACE-Step-Transcriber",
-                    "tooltip": "描述模型，MiDaShengLM-7B 的音乐描述质量最佳。需提前手动下载到本节点 models/ 目录。",
+                "模型": (_get_local_model_keys(), {
+                    "default": _model_default(),
+                    "tooltip": "描述模型（只显示本地已下载的）。MiDaShengLM-7B 的音乐描述质量最佳。",
                 }),
                 "提示词": ("STRING", {
                     "default": _DEFAULT_CAPTION_PROMPT,
@@ -1305,7 +1421,7 @@ class MusicCaptioner:
                     "tooltip": "发给模型的指令，可自行修改调整描述风格。",
                 }),
                 "最大生成长度": ("INT", {
-                    "default": 256, "min": 64, "max": 2000, "step": 16,
+                    "default": 768, "min": 64, "max": 2000, "step": 16,
                 }),
                 "音频时长": ("INT", {
                     "default": 60, "min": 10, "max": 300, "step": 5,
@@ -1338,6 +1454,9 @@ class MusicCaptioner:
     def caption(self, 音频, 模型="ACE-Step-Transcriber", 提示词=_DEFAULT_CAPTION_PROMPT,
                 最大生成长度=256, 音频时长=60, 用后卸载模型=True, 使用Flash注意力=False,
                 温度=0.0, 核采样top_p=1.0, top_k=0, 重复惩罚=1.1, 随机种子=0):
+        if _is_placeholder(模型):
+            print("[MusicAnalyzer] 未检测到任何已下载模型，请先下载到 models/audio_encoders/ 目录。")
+            return ("",)
         torch.manual_seed(随机种子)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(随机种子)
@@ -1427,6 +1546,551 @@ class MusicInfoToJSON:
         return (json.dumps(info, ensure_ascii=False, indent=2),)
 
 
+class MusicInfoToMusic3:
+    """音乐信息转Music3：把分析结果格式化为 MiniMax Music 3 需要的双输入。
+
+    MiniMax Music 3 接收两个文本输入（分别进各自的 CLIPTextEncode）：
+      1. 结构化描述（Structured Caption，按 [Genre]/[BPM]/[Key]/[Instruments]/[Arrangement] 组织）
+      2. 分段歌词（带 [Verse]/[Chorus] 等段落标签）
+
+    注意：JSON 不能直接进 CLIP，必须先经过本节点（或 LLM）二次转换为以上两种文本。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {},
+            "optional": {
+                "歌词": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「歌词转录器」的歌词。建议已带 [Verse]/[Chorus] 等段落标签。",
+                }),
+                "标签": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": "来自「音乐分析器」的逗号分隔标签。",
+                }),
+                "描述": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐描述器」的自然语言描述，会写入 [Arrangement]。",
+                }),
+                "BPM": ("INT", {
+                    "default": 0, "forceInput": True,
+                    "tooltip": "来自「音乐分析器」的 BPM，会写入 [BPM]。",
+                }),
+                "调性": ("STRING", {
+                    "default": "", "forceInput": True,
+                    "tooltip": "来自「音乐分析器」的调性/音阶，会写入 [Key]。",
+                }),
+                "风格改写": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "可选：填目标风格（如「改成赛博朋克摇滚」），将覆盖 [Genre]；留空则用分析出的曲风。",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("结构化描述", "歌词")
+    FUNCTION = "to_music3"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "把分析结果格式化为 MiniMax Music 3 的 Structured Caption + 分段歌词双输入，输出直接接两个 CLIPTextEncode。"
+
+    def to_music3(self, 歌词="", 标签="", 描述="", BPM=0, 调性="", 风格改写=""):
+        lines = []
+        if 风格改写 and 风格改写.strip():
+            lines.append(f"[Genre] {风格改写.strip()}")
+        else:
+            genre = ", ".join(_match_tags(标签, _GENRE_WORDS))
+            if genre:
+                lines.append(f"[Genre] {genre}")
+        if int(BPM or 0) > 0:
+            lines.append(f"[BPM] {int(BPM)}")
+        if 调性 and 调性.strip():
+            lines.append(f"[Key] {调性.strip()}")
+        instruments = ", ".join(_match_tags(标签, _INSTRUMENT_WORDS))
+        if instruments:
+            lines.append(f"[Instruments] {instruments}")
+        if 描述 and 描述.strip():
+            lines.append(f"[Arrangement] {描述.strip()}")
+        caption = "\n".join(lines).strip()
+        return (caption, 歌词 or "")
+
+
+# 风格化输出中「结构化描述 / 歌词」两段的分隔标记
+_REWRITE_SPLIT_MARKER = "<<<LYRICS>>>"
+
+def _split_rewrite_output(text):
+    """把 LLM 输出按标记拆成（结构化描述, 歌词）两段。"""
+    if _REWRITE_SPLIT_MARKER in text:
+        cap, lyr = text.split(_REWRITE_SPLIT_MARKER, 1)
+        return cap.strip(), lyr.strip()
+    return text.strip(), ""
+
+
+class MusicInfoToLLMPrompt:
+    """音乐信息转LLM指令：把分析结果 + 风格提示词组装成给 LLM 的完整指令文本。
+
+    配合 ComfyUI 官方文本生成节点使用（如 TextGenerate / TextGenerateLTX2Prompt，
+    输入 CLIP + prompt 即可让 CLIP（LLM 底座）直接输出文本 STRING）：
+      本节点输出「指令文本」→ 接官方节点的 prompt 输入 → 官方节点生成风格化文本。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "结构化描述": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐信息转Music3」的结构化描述。",
+                }),
+                "歌词": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐信息转Music3」的歌词。",
+                }),
+                "风格提示词": ("STRING", {
+                    "default": "改成赛博朋克摇滚风格，女声，更快节奏", "multiline": True,
+                    "tooltip": "目标风格要求，例如：改成赛博朋克摇滚 / 换成男声 / 加快到 130 BPM。",
+                }),
+            },
+            "optional": {
+                "原始标签": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "（可选）来自「音乐分析器」的标签输出，把 omni 识别的完整原始信息也带给 LLM 参考。留空则不附加。",
+                }),
+                "附加信息": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "（可选）额外附加信息（如音乐信息JSON / 描述），留空则不附加。",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("指令文本",)
+    FUNCTION = "build"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "把结构化描述 + 歌词 + 风格提示词（及可选的 omni 原始标签/附加信息）组装成一段完整指令文本，接 ComfyUI 官方 TextGenerate 节点（prompt 输入）生成风格化提示词。"
+
+    def build(self, 结构化描述="", 歌词="", 风格提示词="", 原始标签="", 附加信息=""):
+        extras = []
+        if 原始标签 and 原始标签.strip():
+            extras.append(f"Raw tags detected by the audio understanding model:\n{原始标签.strip()}")
+        if 附加信息 and 附加信息.strip():
+            extras.append(f"Additional info:\n{附加信息.strip()}")
+        extra_block = ("\n\n" + "\n\n".join(extras)) if extras else ""
+        text = (
+            "You are a music producer preparing a MiniMax Music 3 remake.\n"
+            "Rewrite ONLY the Structured Caption according to the style request. Do not output lyrics.\n"
+            "Output exactly three labeled paragraphs and nothing else. This is a value-filling task: write the finished caption itself, using concrete source-specific musical facts and the requested transformation. Never copy the field names, their definitions, or the wording of this instruction as the answer, and never output placeholders.\n"
+            "Required labels and content:\n"
+            "Global Metadata: one complete sentence containing the actual genre/subgenre, BPM, key/scale, mood, use case, and production texture.\n"
+            "Vocal Details: one complete sentence containing the actual lead vocal gender/register/timbre/delivery, harmonies, vocal effects, and vocal density.\n"
+            "Arrangement: one complete sentence containing the actual instruments, rhythm section, section development, transitions, and ending.\n"
+            "Hard rules:\n"
+            "- Change only musical attributes explicitly requested by the user.\n"
+            "- Preserve the source key unless a key change is explicitly requested.\n"
+            "- If faster/slower is requested without a target BPM, adjust the source BPM moderately.\n"
+            "- Vocal gender, register, and timbre must be internally consistent.\n"
+            "- Preserve the source section sequence unless restructuring is explicitly requested.\n"
+            "- Never output, translate, summarize, or rewrite the lyrics.\n"
+            "- Never copy phrases such as 'genre, subgenre' or 'lead vocal gender/register'; replace them with actual musical content.\n"
+            "- Forbidden output example: 'Global Metadata: genre, subgenre, BPM, key/scale...' or any sentence that merely lists the requested fields.\n"
+            "- Required output example style: 'Global Metadata: warm lo-fi pop ballad, 82 BPM, D-flat major, intimate late-night mood, dusty tape texture.'\n"
+            "- No title, preface, explanation, Markdown fence, or commentary.\n\n"
+            f"Original structured caption:\n{结构化描述 or '(none)'}\n\n"
+            "Lyrics are handled by a separate lossless path and are intentionally omitted here."
+            f"{extra_block}\n\n"
+            f"Style request:\n{风格提示词.strip() or '(keep original style)'}\n\n"
+            "Now write the three completed paragraphs using the source facts above."
+        )
+        return (text,)
+
+
+class MusicLyricsRepairPrompt:
+    """生成歌词轻量纠错提示词，交给文本 LLM 处理。"""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "歌词": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
+            },
+            "optional": {
+                "纠错要求": ("STRING", {
+                    "default": "修复明显的同音字、漏字和不通顺词语，使歌词语义自然。",
+                    "multiline": True,
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("纠错指令",)
+    FUNCTION = "build"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "让文本模型轻量纠错歌词，并为翻唱主动设计适合 Music 3 的段落结构。"
+
+    def build(self, 歌词="", 纠错要求="修复明显的同音字、漏字和不通顺词语，使歌词语义自然。"):
+        text = (
+            "You are a lyric editor and song-structure arranger for MiniMax Music 3.\n"
+            "Treat the ASR transcript as unlabeled source lyrics for a new cover arrangement. Actively design a clear, musically useful section map even when the source contains no section tags.\n"
+            "Freely choose section boundaries and assign [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Instrumental], and [Outro] according to lyric meaning, repeated hooks, emotional peaks, blank lines, and the song arc you infer. The cover arrangement does not have to preserve an unknown original section map.\n"
+            "A memorable or emotionally central passage may be labeled [Chorus] even if it appears only once in a short or incomplete transcript. You may also split an unlabeled block into multiple sections when that produces a better cover structure.\n"
+            "Use only the labels that improve the arrangement; not every label is required. Do not add fake lyric lines merely to fill a section.\n"
+            "Correct obvious ASR homophones, missing characters, or semantically broken phrases when strongly supported, but do not translate, paraphrase, beautify, censor, or invent lyrics.\n"
+            "Preserve every real lyric line and its order whenever possible; do not duplicate, omit, or merge lyric lines.\n"
+            "Output ONLY valid MiniMax Music 3 lyrics, with no explanation, title, metadata, or Markdown fence.\n"
+            "Section tags must be alone on a line and may use only: [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Instrumental], [Outro].\n"
+            "Parenthetical backing vocals or sound cues are allowed only as standalone lines when present or strongly supported.\n"
+            "When a word is uncertain, keep the original wording.\n\n"
+            f"Correction focus: {纠错要求.strip() or 'minimal semantic correction'}\n\n"
+            f"SOURCE LYRICS:\n{歌词 or '(empty)'}"
+        )
+        return (text,)
+
+
+class Music3LyricsFormatter:
+    """确定性清洗歌词，使 LLM 输出符合 Music 3 的分段文本格式。"""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"歌词": ("STRING", {"forceInput": True, "multiline": True})}}
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("歌词",)
+    FUNCTION = "format_lyrics"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "清理代码围栏和说明文字，规范 Music 3 段落标签；不改写歌词内容。"
+
+    _TAGS = {
+        "intro": "Intro", "verse": "Verse", "pre-chorus": "Pre-Chorus",
+        "pre chorus": "Pre-Chorus", "prechorus": "Pre-Chorus",
+        "chorus": "Chorus", "hook": "Chorus", "refrain": "Chorus",
+        "bridge": "Bridge", "instrumental": "Instrumental", "interlude": "Instrumental",
+        "solo": "Instrumental", "outro": "Outro",
+    }
+
+    def format_lyrics(self, 歌词=""):
+        import re
+
+        raw = str(歌词 or "").replace("\r\n", "\n").replace("\r", "\n")
+        raw = re.sub(r"^\s*```(?:text|txt|lyrics)?\s*\n?", "", raw, flags=re.I)
+        raw = re.sub(r"\n?\s*```\s*$", "", raw)
+        lines = []
+        saw_tag = False
+        for source_line in raw.split("\n"):
+            line = source_line.strip()
+            if not line:
+                if lines and lines[-1] != "":
+                    lines.append("")
+                continue
+            line = line.replace("［", "[").replace("］", "]")
+            match = re.match(r"^\[\s*([^\]]+)\s*\](.*)$", line)
+            if match:
+                key = re.sub(r"\s+", " ", match.group(1).strip().lower())
+                tag = self._TAGS.get(key)
+                if tag:
+                    saw_tag = True
+                    if lines and lines[-1] != "":
+                        lines.append("")
+                    lines.append(f"[{tag}]")
+                    trailing = match.group(2).strip()
+                    if trailing:
+                        lines.append(trailing)
+                    continue
+                # Unknown bracket labels are not valid Music 3 section tags.
+                # Keep any trailing lyric text, but remove the unsupported label itself.
+                trailing = match.group(2).strip()
+                if trailing:
+                    lines.append(trailing)
+                continue
+            if not lines and re.match(r"^(lyrics?|歌词)\s*[:：]?$", line, flags=re.I):
+                continue
+            lines.append(line)
+
+        while lines and lines[0] == "":
+            lines.pop(0)
+        while lines and lines[-1] == "":
+            lines.pop()
+        if not saw_tag and lines:
+            lines.insert(0, "[Verse]")
+        return ("\n".join(lines),)
+
+
+class LyricsDurationEstimator:
+    """歌词时长估算：以「基准时长」为中心，按歌词句数做温和修正。
+
+    设计思路（以正常歌曲 2 分半为基准）：
+      秒数 = 基准时长 + (实际歌词句数 - 参考句数) × 每句修正秒数
+    歌词正好 24 句（一首歌的正常量）就用基准时长 150 秒；
+    歌词多几句就多几秒、少几句就少几秒，并限制在 [最小时长, 最大时长] 内，
+    不会因为歌词太短就生成几十秒的残歌，也不会因为歌词太长而无脑拉长。
+
+    输出 FLOAT 秒数直接接 MiniMaxMusic3TextEncode 的 max_duration 输入；
+    所有参数均可手动调节（想固定时长就把「每句修正秒数」调成 0）。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "歌词": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "歌词文本（含 [Verse]/[Chorus] 等段落标签）。来自「音乐信息转Music3」或 LLM 接入后的歌词。",
+                }),
+            },
+            "optional": {
+                "基准时长": ("FLOAT", {
+                    "default": 150.0, "min": 30.0, "max": 300.0, "step": 5.0,
+                    "tooltip": "歌曲基准时长（秒），默认 150 秒 = 2 分半。歌词句数等于「参考句数」时就用这个值。",
+                }),
+                "参考句数": ("INT", {
+                    "default": 24, "min": 1, "max": 200, "step": 1,
+                    "tooltip": "正常歌曲的歌词句数，达到这个数就用基准时长。",
+                }),
+                "每句修正秒数": ("FLOAT", {
+                    "default": 2.0, "min": 0.0, "max": 10.0, "step": 0.5,
+                    "tooltip": "歌词每多/少一句，时长增减的秒数。调成 0 = 完全固定用基准时长。",
+                }),
+                "最小时长": ("FLOAT", {
+                    "default": 90.0, "min": 30.0, "max": 300.0, "step": 5.0,
+                    "tooltip": "结果下限（秒）。歌词再短也不会低于这个值。",
+                }),
+                "最大时长": ("FLOAT", {
+                    "default": 240.0, "min": 60.0, "max": 600.0, "step": 10.0,
+                    "tooltip": "结果上限（秒）。歌词再长也不会超过这个值（也受 Music 3 支持范围约束）。",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("FLOAT", "INT")
+    RETURN_NAMES = ("秒数", "整秒")
+    FUNCTION = "estimate"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "以基准时长（默认150秒/2分半）为中心，按歌词句数温和修正生成时长（多句+秒、少句-秒，限制在上下限内），输出接 MiniMaxMusic3TextEncode 的 max_duration。所有参数可手动调节。"
+
+    def estimate(self, 歌词="", 基准时长=150.0, 参考句数=24, 每句修正秒数=2.0,
+                 最小时长=90.0, 最大时长=240.0):
+        lines = (歌词 or "").splitlines()
+        # 跳过空行与段落标签行（[Verse]、[Chorus] 等）
+        lyric_lines = [ln.strip() for ln in lines
+                       if ln.strip() and not ln.strip().startswith("[")]
+        count = len(lyric_lines)
+        seconds = 基准时长 + (count - 参考句数) * 每句修正秒数
+        seconds = round(max(最小时长, min(最大时长, seconds)), 1)
+        print(f"[MusicAnalyzer·歌词时长估算] 歌词 {count} 句（参考 {参考句数}）-> {seconds}s（基准 {基准时长}s，每句 ±{每句修正秒数}s，范围 {最小时长}-{最大时长}s）")
+        return (seconds, int(seconds))
+
+
+class AudioDuration:
+    """读取输入音频真实时长，并限制到 Music 3 一条龙支持的范围。"""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "音频": ("AUDIO", {"forceInput": True}),
+            },
+            "optional": {
+                "最小时长": ("FLOAT", {"default": 60.0, "min": 1.0, "max": 600.0, "step": 1.0}),
+                "最大时长": ("FLOAT", {"default": 240.0, "min": 1.0, "max": 600.0, "step": 1.0}),
+            },
+        }
+
+    RETURN_TYPES = ("FLOAT", "INT")
+    RETURN_NAMES = ("秒数", "整秒")
+    FUNCTION = "measure"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "从 LoadAudio 的 waveform 和 sample_rate 读取真实时长；默认限制为 60–240 秒并接入 Music3。"
+
+    def measure(self, 音频, 最小时长=60.0, 最大时长=240.0):
+        waveform = 音频.get("waveform") if isinstance(音频, dict) else None
+        sample_rate = 音频.get("sample_rate") if isinstance(音频, dict) else None
+        if waveform is None or not sample_rate:
+            raise ValueError("[MusicAnalyzer] 无法从 AUDIO 输入读取 waveform/sample_rate。")
+        samples = int(waveform.shape[-1])
+        actual = samples / float(sample_rate)
+        lower = min(float(最小时长), float(最大时长))
+        upper = max(float(最小时长), float(最大时长))
+        seconds = round(max(lower, min(upper, actual)), 1)
+        print(f"[MusicAnalyzer·自动时长] 音频实际 {actual:.2f}s -> Music3 时长 {seconds:.1f}s（范围 {lower:.1f}-{upper:.1f}s）")
+        return (seconds, int(round(seconds)))
+
+
+class AnalysisOverview:
+    """分析结果总览：把 omni 识别出的全部信息汇总成一段易读文本。
+
+    输入来自「音乐分析器 / 歌词转录器 / 音乐描述器」的输出（均可选），
+    汇总后打印到控制台并原样输出，让你一眼看到模型到底识别出了什么。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {},
+            "optional": {
+                "标签": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐分析器」的标签输出。",
+                }),
+                "BPM": ("INT", {
+                    "default": 0, "forceInput": True,
+                    "tooltip": "来自「音乐分析器」的 BPM。",
+                }),
+                "调性": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐分析器」的调性（如 G minor）。",
+                }),
+                "歌词": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「歌词转录器」的歌词。",
+                }),
+                "描述": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐描述器」的描述。",
+                }),
+                "音乐信息JSON": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "来自「音乐信息转JSON」的结构化 JSON（可选）。",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("总览文本",)
+    FUNCTION = "overview"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "把 omni 识别出的全部信息（标签/BPM/调性/歌词/描述/JSON）汇总成一段易读文本并打印到控制台，方便检查识别质量。"
+
+    def overview(self, 标签="", BPM=0, 调性="", 歌词="", 描述="", 音乐信息JSON=""):
+        parts = []
+        parts.append("【音乐分析结果·omni 识别】")
+        parts.append(f"标签: {标签 or '(空)'}")
+        parts.append(f"BPM: {BPM if BPM else '(未检测)'}")
+        parts.append(f"调性: {调性 or '(未检测)'}")
+        if 歌词 and 歌词.strip():
+            parts.append(f"\n歌词:\n{歌词.strip()}")
+        if 描述 and 描述.strip():
+            parts.append(f"\n描述:\n{描述.strip()}")
+        if 音乐信息JSON and 音乐信息JSON.strip():
+            parts.append(f"\n音乐信息JSON:\n{音乐信息JSON.strip()}")
+        text = "\n".join(parts)
+        print(f"[MusicAnalyzer·分析结果总览]\n{text}\n{'=' * 60}")
+        return (text,)
+
+
+class MusicLLMToMusic3:
+    """LLM输出接入Music3：把官方文本生成节点输出的文本按 <<<LYRICS>>> 拆成 caption/lyrics 两段。
+
+    输入是 ComfyUI 官方 TextGenerate / TextGenerateLTX2Prompt 等节点的 generated_text 输出，
+    拆分失败时回退到兜底输入（可接「音乐信息转Music3」的输出）。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "LLM输出文本": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "官方 TextGenerate / TextGenerateLTX2Prompt 的 generated_text 输出。",
+                }),
+            },
+            "optional": {
+                "兜底描述": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "LLM 输出无法拆分时回退的结构化描述（可接「音乐信息转Music3」）。",
+                }),
+                "兜底歌词": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "LLM 输出无法拆分时回退的歌词。",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("caption", "lyrics")
+    FUNCTION = "connect"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "把官方文本生成节点的输出按 <<<LYRICS>>> 拆成 caption/lyrics 两段，直接接 MiniMaxMusic3TextEncode 输入。"
+
+    def connect(self, LLM输出文本="", 兜底描述="", 兜底歌词=""):
+        cap, lyr = _split_rewrite_output(LLM输出文本 or "")
+        if not cap:
+            cap = 兜底描述 or ""
+        if not lyr:
+            lyr = 兜底歌词 or ""
+        return (cap, lyr)
+
+
+class Music3PromptAdapter:
+    """音乐信息接入Music3：把两段提示词接到 MiniMax Music 3 的输入。
+
+    输入的两段文本（结构化描述 + 歌词）可以来自「音乐信息转Music3」的格式化输出，
+    也可以来自其他 CLIP（本地 LLM 底座）参考风格提示转写的结果。
+    输出端口命名 caption / lyrics，与官方 MiniMaxMusic3TextEncode（或官方工作流
+    子图节点）的输入一一对应，直接连线即可，生成部分无需再管。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {},
+            "optional": {
+                "结构化描述": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "第一段：结构化描述（对应 caption）。可来自「音乐信息转Music3」，或 CLIP/LLM 参考风格提示转写的结果。",
+                }),
+                "歌词": ("STRING", {
+                    "default": "", "multiline": True, "forceInput": True,
+                    "tooltip": "第二段：歌词，含 [Verse]/[Chorus] 等段落标签（对应 lyrics）。",
+                }),
+            },
+        }
+
+    RETURN_TYPES = ("STRING", "STRING")
+    RETURN_NAMES = ("caption", "lyrics")
+    FUNCTION = "connect"
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "把两段提示词（结构化描述 + 歌词）原样透传，输出端口命名为 caption/lyrics，直接连线到 MiniMax Music 3 的对应输入。"
+
+    def connect(self, 结构化描述="", 歌词=""):
+        return (结构化描述 or "", 歌词 or "")
+
+
+class TextPreview:
+    """文本预览：把链路中任意一段文本原样透传，同时打印到控制台。
+
+    可插在任意 STRING 链路的中间（输入输出都是 STRING，不影响连线），
+    用于查看「音乐信息转LLM指令」生成的指令、LLM 扩写结果、或最终
+    caption/lyrics 的内容；输出也可直接接显示节点查看。
+    """
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "text": ("STRING", {"forceInput": True}),
+            },
+            "hidden": {
+                "unique_id": "UNIQUE_ID",
+                "extra_pnginfo": "EXTRA_PNGINFO",
+            },
+        }
+
+    INPUT_IS_LIST = True
+    RETURN_TYPES = ("STRING",)
+    RETURN_NAMES = ("STRING",)
+    FUNCTION = "preview"
+    OUTPUT_NODE = True
+    OUTPUT_IS_LIST = (True,)
+    CATEGORY = "音频/音乐分析"
+    DESCRIPTION = "把输入的文本原样透传并打印到控制台，用于预览链路中的提示词/歌词等文本内容。可串在任意 STRING 链路中间。"
+
+    def preview(self, text, unique_id=None, extra_pnginfo=None):
+        if isinstance(text, list):
+            text = "\n".join(str(item) for item in text)
+        text = str(text or "")
+        print(f"[MusicAnalyzer·文本预览]\n{text}\n{'=' * 50}")
+        return {"ui": {"text": text}, "result": (text,)}
+
+
 # ===========================================================================
 # 10. 节点注册
 # ===========================================================================
@@ -1436,6 +2100,15 @@ NODE_CLASS_MAPPINGS = {
     "MusicTranscriber": MusicTranscriber,
     "MusicCaptioner": MusicCaptioner,
     "MusicInfoToJSON": MusicInfoToJSON,
+    "MusicInfoToMusic3": MusicInfoToMusic3,
+    "MusicInfoToLLMPrompt": MusicInfoToLLMPrompt,
+    "MusicLyricsRepairPrompt": MusicLyricsRepairPrompt,
+    "Music3LyricsFormatter": Music3LyricsFormatter,
+    "MusicLLMToMusic3": MusicLLMToMusic3,
+    "Music3PromptAdapter": Music3PromptAdapter,
+    "LyricsDurationEstimator": LyricsDurationEstimator,
+    "AudioDuration": AudioDuration,
+    "AnalysisOverview": AnalysisOverview,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -1443,4 +2116,13 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "MusicTranscriber": "歌词转录器",
     "MusicCaptioner": "音乐描述器",
     "MusicInfoToJSON": "音乐信息转JSON",
+    "MusicInfoToMusic3": "音乐信息转Music3",
+    "MusicInfoToLLMPrompt": "音乐信息转LLM指令",
+    "MusicLyricsRepairPrompt": "歌词语义纠错指令",
+    "Music3LyricsFormatter": "Music3歌词格式化",
+    "MusicLLMToMusic3": "LLM输出接入Music3",
+    "Music3PromptAdapter": "音乐信息接入Music3",
+    "LyricsDurationEstimator": "歌词时长估算",
+    "AudioDuration": "音频自动时长",
+    "AnalysisOverview": "分析结果总览",
 }
