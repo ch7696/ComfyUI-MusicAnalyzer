@@ -511,9 +511,9 @@ def _extract_tags_qwen_omni(audio_dict, model, processor, max_new_tokens, audio_
     inputs = inputs.to(model.device).to(model.dtype)
     input_len = inputs["input_ids"].shape[-1]
     gk = {"max_new_tokens": max_new_tokens}
-    # Transformers 5 renamed return_audio to generation_mode. Explicit text
-    # mode is required after the talker is disabled to avoid audio generation.
-    gk["generation_mode"] = "text"
+    # Transformers 4.x uses return_audio; generation_mode is a Transformers 5
+    # argument and is rejected by the Qwen2.5-Omni model on this environment.
+    gk["return_audio"] = False
     gk["use_audio_in_video"] = True
     gk["pad_token_id"] = int(_qwen_pad_id(processor))
     gk.update(gen_kwargs or {})
@@ -1130,13 +1130,12 @@ def _generate_text(audio_dict, model_key, user_text, max_new_tokens, audio_durat
     gk = {"max_new_tokens": max_new_tokens}
     gk.update(gen_kwargs)
     if model_key.startswith("Qwen2.5-Omni") or _is_acestep_transcriber_model(model_key):
-        # The plugin disables the talker to save VRAM; force text-only mode
-        # even when the model no longer exposes a talker attribute.
-        gk.setdefault("generation_mode", "text")
+        # The plugin disables the talker to save VRAM; force text-only mode.
+        gk.setdefault("return_audio", False)
         gk.setdefault("use_audio_in_video", True)
         gk.setdefault("pad_token_id", int(_qwen_pad_id(processor)))
     elif hasattr(model, "talker"):
-        gk.setdefault("generation_mode", "text")
+        gk.setdefault("return_audio", False)
         gk.setdefault("use_audio_in_video", True)
         gk.setdefault("pad_token_id", int(_qwen_pad_id(processor)))
     with torch.inference_mode():
