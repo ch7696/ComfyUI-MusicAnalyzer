@@ -645,6 +645,7 @@ def _extract_tags_acestep_transcriber(audio_dict, model, processor, max_new_toke
     y = _prepare_audio_mono(audio_dict, 16000, audio_duration)
 
     conversation = [
+        {"role": "system", "content": [{"type": "text", "text": "You are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, capable of perceiving auditory and visual inputs, as well as generating text and speech."}]},
         {"role": "user", "content": [
             {"type": "text", "text": "*Task* Transcribe this audio in detail"},
             {"type": "audio", "audio": y, "sampling_rate": 16000},
