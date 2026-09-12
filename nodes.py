@@ -1119,10 +1119,13 @@ def _generate_text(audio_dict, model_key, user_text, max_new_tokens, audio_durat
         out = processor.batch_decode(generated_ids, skip_special_tokens=True)
         return out[0].strip() if out else ""
     else:
-        conversation = [{"role": "user", "content": [
+        conversation = []
+        if _is_acestep_transcriber_model(model_key) or model_key.startswith("Qwen2.5-Omni"):
+            conversation.append({"role": "system", "content": [{"type": "text", "text": "You are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, capable of perceiving auditory and visual inputs, as well as generating text and speech."}]})
+        conversation.append({"role": "user", "content": [
             {"type": "text", "text": user_text},
             {"type": "audio", "audio": y, "sampling_rate": 16000},
-        ]}]
+        ]})
 
     text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True, tokenize=False)
     inputs = processor(text=text_prompt, audio=[y], sampling_rate=16000, return_tensors="pt", padding=True)
