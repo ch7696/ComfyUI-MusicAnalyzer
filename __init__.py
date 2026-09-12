@@ -7,8 +7,11 @@ ComfyUI-MusicAnalyzer —— 音乐理解与结构化描述节点包
 
 本包只包含「分析」能力，不含任何音频生成逻辑。
 
-音频理解核心代码提取并重构自 ComfyUI-AceStep_SFT（MIT 协议），
+音频理解核心代码提取并重构自 ComfyUI-AceStep_SFT，
 并新增了 MiDaShengLM / Qwen3-Omni 支持与结构化 JSON 输出节点。
+
+本项目以 Apache License 2.0 发布；源自 ComfyUI-AceStep_SFT 的代码片段
+及其版权信息保留上游 MIT 许可，详见 LICENSE-ACE-STEP-MIT。
 
 模型存放（ComfyUI 官方共用目录）：ComfyUI/models/audio_encoders/<模型名>/
 """

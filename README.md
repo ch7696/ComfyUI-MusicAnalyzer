@@ -6,12 +6,15 @@
 
 <p align="center">
   <strong>ComfyUI 音频理解与音乐工作流扩展</strong><br>
-  面向翻唱分析、结构化描述和 MiniMax Music 3 提示词编排。
+  面向翻唱分析、结构化描述和 MiniMax Music 3 提示词编排。<br>
+  <em>完全本地运行 · 不依赖在线 API · 支持本地及共享模型库</em>
 </p>
 
 ComfyUI-MusicAnalyzer 将音频解析为统一的结构化信息，包括**歌词、BPM、调性、曲风、情绪、乐器、声乐特征和段落结构**，并提供 JSON、自然语言描述以及 MiniMax Music 3 Structured Caption / 分段歌词接口。
 
-本项目聚焦音频分析和文本处理，不包含音频生成模型；生成环节由 ComfyUI 中已安装的 Music 3 或其他生成节点完成。音频理解核心代码提取并重构自 [ComfyUI-AceStep_SFT](https://github.com/ACE-Step/ComfyUI-AceStep_SFT)（MIT 协议），并扩展 MiDaShengLM、Qwen3-Omni 及结构化 JSON 支持。
+本项目支持完全本地化部署：模型从本地目录或本地挂载的共享模型库加载，音频、提示词和推理过程均在当前 ComfyUI 进程中完成，不依赖第三方在线 API 或远程推理服务。使用云端 GPU 时，仍由用户实例内的本地 ComfyUI 进程执行，云平台仅提供计算资源。
+
+本项目聚焦音频分析和文本处理，不包含音频生成模型；生成环节由 ComfyUI 中已安装的 Music 3 或其他生成节点完成。音频理解核心代码提取并重构自 [ComfyUI-AceStep_SFT](https://github.com/ACE-Step/ComfyUI-AceStep_SFT)，并扩展 MiDaShengLM、Qwen3-Omni 及结构化 JSON 支持。
 
 ## 节点一览
 
@@ -77,6 +80,12 @@ python -m pip install -r requirements.txt
 
 重启 ComfyUI 后，可在节点菜单的 `音频/音乐分析` 分类中使用本扩展的全部节点。
 
+### 本地运行说明
+
+本扩展不要求配置在线服务密钥，也不会将音频或分析结果上传至第三方接口。只要
+ComfyUI、依赖包和所需模型已安装在本地环境（或用户控制的 GPU 实例）中，即可
+完成完整的分析、文本改写和 Music 3 推理流程。
+
 ## 模型准备与支持
 
 模型文件由使用者另行准备，本扩展不执行自动下载。模型应放置于 ComfyUI 的共享目录 `ComfyUI/models/audio_encoders/<模型名>/`，目录中须包含 `config.json` 及完整的权重文件（含所有分片）。该目录可供其他 ComfyUI 扩展复用。
@@ -98,7 +107,7 @@ ln -s /shared/models/audio_encoders/ACE-Step-Transcriber \
 huggingface-cli download ACE-Step/acestep-transcriber --local-dir "ComfyUI/models/audio_encoders/ACE-Step-Transcriber"
 ```
 
-也可以用仓库根目录的 `download_models.bat` 一键下载推荐模型（脚本同样下载到该官方目录）。
+仓库根目录提供 `download_models.bat`，可将推荐模型下载至上述官方目录。
 
 | 模型 | 仓库 ID | 用途 | 显存参考 |
 |---|---|---|---|
@@ -220,4 +229,5 @@ LoadAudio (VHS)
 
 ## 协议
 
-MIT License，详见 [LICENSE](LICENSE)。音频理解核心逻辑源自 [ComfyUI-AceStep_SFT](https://github.com/ACE-Step/ComfyUI-AceStep_SFT)（MIT）。
+本项目以 Apache License 2.0 发布，详见 [LICENSE](LICENSE)。从
+[ComfyUI-AceStep_SFT](https://github.com/ACE-Step/ComfyUI-AceStep_SFT) 提取的代码片段及其相关版权信息保留上游 MIT 许可，详见 [LICENSE-ACE-STEP-MIT](LICENSE-ACE-STEP-MIT)。
