@@ -2082,7 +2082,10 @@ class TextPreview:
     RETURN_NAMES = ("STRING",)
     FUNCTION = "preview"
     OUTPUT_NODE = True
-    OUTPUT_IS_LIST = (True,)
+    # 输入使用列表模式是为了兼容 ComfyUI 的批量调度；输出必须保持单个
+    # STRING，否则 ComfyUI 会把字符串当作字符列表展开，导致下游节点被
+    # 重复执行（Music3 可能因此重复采样或触发 CUDA 错误）。
+    OUTPUT_IS_LIST = (False,)
     CATEGORY = "音频/音乐分析"
     DESCRIPTION = "把输入的文本原样透传并打印到控制台，用于预览链路中的提示词/歌词等文本内容。可串在任意 STRING 链路中间。"
 
@@ -2109,6 +2112,7 @@ NODE_CLASS_MAPPINGS = {
     "Music3LyricsFormatter": Music3LyricsFormatter,
     "MusicLLMToMusic3": MusicLLMToMusic3,
     "Music3PromptAdapter": Music3PromptAdapter,
+    "TextPreview": TextPreview,
     "LyricsDurationEstimator": LyricsDurationEstimator,
     "AudioDuration": AudioDuration,
     "AnalysisOverview": AnalysisOverview,
@@ -2125,6 +2129,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Music3LyricsFormatter": "Music3歌词格式化",
     "MusicLLMToMusic3": "LLM输出接入Music3",
     "Music3PromptAdapter": "音乐信息接入Music3",
+    "TextPreview": "文本预览",
     "LyricsDurationEstimator": "歌词时长估算",
     "AudioDuration": "音频自动时长",
     "AnalysisOverview": "分析结果总览",

@@ -1,8 +1,17 @@
 # ComfyUI-MusicAnalyzer
 
-音乐理解与结构化描述节点包 —— 把一段音频变成一份**结构化的音乐信息**（歌词、BPM、调性、曲风、情绪、乐器、段落结构、自然语言描述），输出统一 JSON，方便交给 LLM 改写，或直接喂给文生音乐模型（如 MiniMax Music 3）。
+<p align="center">
+  <img src="assets/logo.png" alt="野茶柿 Studio 路边E条" width="360">
+</p>
 
-> 只做「分析」，不含任何生成逻辑。
+<p align="center">
+  <strong>音频理解、翻唱分析与 MiniMax Music 3 提示词桥接节点</strong><br>
+  把一段音频整理成可读、可改写、可复用的结构化音乐信息。
+</p>
+
+音乐理解与结构化描述节点包 —— 提取**歌词、BPM、调性、曲风、情绪、乐器、段落结构和自然语言描述**，输出统一 JSON，并提供面向 MiniMax Music 3 的 Structured Caption / 分段歌词适配链路。
+
+> 本仓库负责音频分析和文本桥接，不包含音频生成模型本身；生成仍由你安装的 Music 3 或其他 ComfyUI 节点完成。
 > 音频理解核心代码提取并重构自 [ComfyUI-AceStep_SFT](https://github.com/ACE-Step/ComfyUI-AceStep_SFT)（MIT 协议），并新增 MiDaShengLM / Qwen3-Omni 支持与结构化 JSON 节点。本仓库同样以 MIT 协议开源。
 
 ## 节点一览
@@ -62,16 +71,28 @@ LoadAudio
 把本目录放到 ComfyUI 的 `custom_nodes/` 下：
 
 ```bash
-git clone https://your-host/ComfyUI-MusicAnalyzer.git ComfyUI/custom_nodes/ComfyUI-MusicAnalyzer
+git clone https://github.com/ch7696/ComfyUI-MusicAnalyzer.git ComfyUI/custom_nodes/ComfyUI-MusicAnalyzer
 cd ComfyUI/custom_nodes/ComfyUI-MusicAnalyzer
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
-重启 ComfyUI 后，在节点菜单的 `音频/音乐分析` 分类下即可找到四个节点。
+重启 ComfyUI 后，在节点菜单的 `音频/音乐分析` 分类下即可找到全部节点。
 
 ## 模型支持（手动下载，不自动下载）
 
-节点**不会**自动下载任何模型。需要先把模型放到 ComfyUI **官方共用目录** `ComfyUI/models/audio_encoders/<模型名>/`（目录内须有 `config.json`）——这是 ComfyUI 官方注册的音频模型目录，其他插件也可以共用。
+节点**不会**自动下载任何模型。需要先把模型放到 ComfyUI **官方共用目录** `ComfyUI/models/audio_encoders/<模型名>/`（目录内须有 `config.json`，以及完整的权重文件/分片）——这是 ComfyUI 官方注册的音频模型目录，其他插件也可以共用。
+
+如果模型放在共享盘或集中式模型仓库，可以把整个目录，或某个模型目录，软链接到这里。软链接只改变路径，不会补齐缺失文件；例如 Linux 上可以使用：
+
+```bash
+# 共享仓库中应包含完整的 ACE-Step-Transcriber 目录和全部权重分片
+ln -s /shared/models/audio_encoders/ACE-Step-Transcriber \
+  ComfyUI/models/audio_encoders/ACE-Step-Transcriber
+```
+
+确认链接目标可读，并检查分片模型的 `model.safetensors.index.json` 与所有
+`model-00001-of-00003.safetensors` … `model-00003-of-00003.safetensors` 均存在。
+缺少任意一片都会在第一次加载时出现 `No such file or directory`。Windows 可以用资源管理器创建目录联接，或使用管理员命令行的 `mklink /J`；目录名要与节点下拉框显示的名称一致。
 
 下载命令示例（国内网络建议先执行 `set HF_ENDPOINT=https://hf-mirror.com`）：
 
@@ -107,6 +128,22 @@ huggingface-cli download ACE-Step/acestep-transcriber --local-dir "ComfyUI/model
 | 轻量纯歌词 | Whisper-large-v3-turbo | ~3GB，速度快 |
 
 一句话：**ACE-Step-Transcriber 当默认主力；要冲描述质量就加 MiDaShengLM-7B。**
+
+## MiniMax Music 3 稳定性说明
+
+Music 3 的文本编码器会进行较长的自回归采样，并反复使用 KV cache。部分
+ComfyUI 0.35.x + PyTorch/CUDA 环境在启用 `comfy-aimdo` 动态编译器时，可能在
+第二次或后续采样出现 `aimdo memory compile error`、`device-side assert triggered`
+或 `ScatterGatherKernel` 错误。此时建议在启动参数中加入：
+
+```bash
+python main.py --disable-comfy-compiler
+```
+
+这只关闭 ComfyUI 的内存编译/CUDA Graph 优化，**仍然使用 GPU 推理**；通常只是
+略慢一些，但对 Music 3 的 AR/KV cache 链路更稳。若同时使用启动器已有的
+`--disable-cuda-malloc`，可以保留两个参数。修改启动参数后需完整重启 ComfyUI，
+不要在同一个已经报过 CUDA assert 的进程里继续提交任务。
 
 ## 典型工作流
 
@@ -148,9 +185,25 @@ LoadAudio (VHS)
 ## 常见问题
 
 - **模型在哪下载？** 本仓库不做自动下载。先执行 `set HF_ENDPOINT=https://hf-mirror.com`（国内网络），再用 `huggingface-cli download <仓库ID> --local-dir "ComfyUI/models/audio_encoders/<模型名>"` 下载，详见上文模型支持表。
+- **模型已经软链接，为什么仍提示缺少 safetensors？** 先确认 ComfyUI 进程实际使用的 `models` 根目录，再检查软链接目标中是否包含 `config.json`、索引文件和全部分片；只链接一个空目录或只下载第一片都无法加载。
 - **显存不足**：改用 3B 档模型；`音频时长` 调小；用后卸载模型保持开启。
 - **Qwen3-Omni 报错**：`pip install -U transformers`（需要 ≥4.53）。
 - **MiDaShengLM GPTQ 报错**：`pip install auto-gptq`，或改用 BF16 版。
+- **Music 3 后续推理出现 `aimdo memory compile error` / CUDA assert？** 按上面的稳定性说明用 `--disable-comfy-compiler` 重启；它不会把推理切到 CPU。
+- **文本预览节点导致下游重复执行？** 更新到最新版本。`TextPreview` 的输入可以批量接收，但输出固定为一个 STRING，避免把字符串拆成字符列表后重复触发 Music 3。
+
+## 合作算力平台
+
+本项目适合部署在带 GPU 的云端 ComfyUI 环境中。下面是我们的合作平台入口，
+可用于按需启动 ComfyUI、音频理解和 Music 3 工作流；注册时链接会自动带上
+对应的邀请码或邀请关系，具体价格、库存和活动以平台页面为准。
+
+- **优云智算**：提供按需 GPU 云主机和镜像环境，适合快速试跑 ComfyUI、音频模型及 Music 3。
+  [注册入口（邀请码）](https://passport.compshare.cn/register?referral_code=GMpN6yndJi2BFfvScmzRH2)
+- **仙宫云**：提供面向 AI 工作流的云端算力，适合需要弹性显卡和长时任务的场景。
+  [注册入口（邀请链接）](https://www.xiangongyun.com/register/7AL3V3)
+
+以上链接属于合作推广入口，不代表本仓库对平台服务、价格或可用性作额外保证。
 
 ## 协议
 

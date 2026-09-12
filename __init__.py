@@ -19,7 +19,13 @@ import folder_paths
 
 # 使用 ComfyUI 官方注册的 audio_encoders 目录（models/audio_encoders/）。
 # 老版本 ComfyUI 若尚未注册，则补注册一次（幂等，路径相同，其他插件同样可共用）。
-if not folder_paths.get_folder_paths("audio_encoders"):
+# 某些旧版没有预先注册该 key，直接 get_folder_paths 会抛 KeyError；这里兼容两种情况。
+try:
+    _audio_encoder_paths = folder_paths.get_folder_paths("audio_encoders")
+except (KeyError, AttributeError):
+    _audio_encoder_paths = []
+
+if not _audio_encoder_paths:
     folder_paths.add_model_folder_path(
         "audio_encoders", os.path.join(folder_paths.models_dir, "audio_encoders")
     )
